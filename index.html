@@ -17,13 +17,13 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Fases e Fezes">
-  <link rel="apple-touch-icon" href="icons/app-logo-192.png?v=28">
+  <link rel="apple-touch-icon" href="icons/app-logo-192.png?v=30">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png?v=28"/>
+  <link rel="icon" type="image/png" href="favicon.png?v=30"/>
 
   <title>Fases e Fezes - Vertente</title>
-  <link rel="manifest" href="manifest.json?v=28">
+  <link rel="manifest" href="manifest.json?v=30">
 
   <style>
     body {
@@ -110,7 +110,7 @@
 <body>
   <!-- Tela de Abertura / Splash Screen Instantânea -->
   <div id="flutter_splash">
-    <img src="icons/app-logo-192.png?v=25" alt="Logo" class="splash-logo" />
+    <img src="icons/app-logo-192.png?v=30" alt="Logo" class="splash-logo" />
     <div class="splash-title">Fases e Fezes</div>
     <div class="splash-subtitle">Agropecuária Vertente</div>
     <div class="splash-loader-bar"></div>
@@ -118,6 +118,37 @@
   </div>
 
   <script>
+    // Alguma máquina tem tempo ou viagem ainda não salvos (sessão gravada pelo app em SessaoColetaService)
+    function temSessaoAtiva() {
+      try {
+        const raw = localStorage.getItem('sessao_coleta_ativa_v1');
+        if (!raw) return false;
+        return (JSON.parse(raw).maquinas || []).some(function(m) {
+          return m.inicioTrecho
+            || Object.keys(m.msAcumulado || {}).length > 0
+            || (m.viagensEmTransito || []).length > 0
+            || (m.viagensConcluidas || []).length > 0;
+        });
+      } catch (_) { return false; }
+    }
+
+    // Manda ao Service Worker tudo o que esta página carregou (motor gráfico, fontes, Firebase)
+    // para que o app abra sem internet na próxima vez
+    function guardarRecursosOffline() {
+      if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+      try {
+        const urls = performance.getEntriesByType('resource').map(function(e) { return e.name; });
+        navigator.serviceWorker.controller.postMessage({ type: 'GUARDAR_RECURSOS', urls: urls });
+      } catch (_) {}
+    }
+
+    // Pede ao navegador para não apagar os dados do app (medições não sincronizadas)
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted().then(function(ja) {
+        if (!ja) navigator.storage.persist().catch(function() {});
+      }).catch(function() {});
+    }
+
     // Remove o splash assim que o primeiro frame do Flutter é desenhado
     window.addEventListener('flutter-first-frame', function () {
       const splash = document.getElementById('flutter_splash');
@@ -125,6 +156,8 @@
         splash.style.opacity = '0';
         setTimeout(function() { splash.remove(); }, 350);
       }
+      // Espera o Firebase e as fontes terminarem de carregar
+      setTimeout(guardarRecursosOffline, 4000);
     });
 
     // Fallback: se o evento demorar mais de 6s, remove o splash para segurança
@@ -137,7 +170,17 @@
     }, 6000);
 
     // Função global chamada pelo Flutter para forçar atualização total e purgar caches
+    // Endereço do app relativo à pasta onde ele está (raiz no Firebase, /fases-fezes/ no GitHub)
+    function urlRecarregar() {
+      return new URL('./?v=2.1&t=' + Date.now(), document.baseURI).href;
+    }
+
     window.forcarAtualizacaoPwa = function() {
+      // Apagar o cache sem internet deixaria o app sem abrir
+      if (!navigator.onLine) {
+        alert('Sem internet: a atualização será feita quando o sinal voltar.');
+        return;
+      }
       console.log('[PWA] Forçando atualização total e limpeza de cache...');
       if ('caches' in window) {
         caches.keys().then(function(names) {
@@ -147,22 +190,22 @@
             navigator.serviceWorker.getRegistrations().then(function(regs) {
               return Promise.all(regs.map(function(r) { return r.unregister(); }));
             }).then(function() {
-              window.location.replace('/?v=2.1&t=' + Date.now());
+              window.location.replace(urlRecarregar());
             });
           } else {
-            window.location.replace('/?v=2.1&t=' + Date.now());
+            window.location.replace(urlRecarregar());
           }
         });
       } else {
-        window.location.replace('/?v=2.1&t=' + Date.now());
+        window.location.replace(urlRecarregar());
       }
     };
 
-    // Purgar de forma incondicional qualquer cache diferente da versão atual v28
+    // Purgar de forma incondicional qualquer cache diferente da versão atual v30
     if ('caches' in window) {
       caches.keys().then(function(cacheNames) {
         cacheNames.forEach(function(c) {
-          if (c !== 'fases-e-fezes-v28') {
+          if (c !== 'fases-e-fezes-v30' && c !== 'fases-e-fezes-externos') {
             console.log('[PWA] Purgando cache antigo:', c);
             caches.delete(c);
           }
@@ -173,15 +216,28 @@
     // Registro do Service Worker com recarregamento automático no controllerchange e message
     if ('serviceWorker' in navigator) {
       let refreshing = false;
+      let recarregarPendente = false;
       function autoReload() {
-        if (!refreshing) {
-          refreshing = true;
-          console.log('[PWA] Atualização aplicada! Recarregando com a versão mais recente...');
-          window.location.reload();
+        if (refreshing) return;
+        // Não recarrega no meio de uma medição: espera todas as máquinas serem salvas
+        if (temSessaoAtiva()) {
+          if (!recarregarPendente) console.log('[PWA] Atualização adiada: há medições em andamento.');
+          recarregarPendente = true;
+          return;
         }
+        refreshing = true;
+        console.log('[PWA] Atualização aplicada! Recarregando com a versão mais recente...');
+        window.location.reload();
       }
+      setInterval(function() {
+        if (recarregarPendente) autoReload();
+      }, 15000);
 
-      navigator.serviceWorker.addEventListener('controllerchange', autoReload);
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        // O novo Service Worker ainda não guardou o motor gráfico desta versão do navegador
+        guardarRecursosOffline();
+        autoReload();
+      });
 
       navigator.serviceWorker.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'RELOAD_NOW') {
@@ -190,9 +246,9 @@
       });
 
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('sw.js?v=28').then(function(reg) {
+        navigator.serviceWorker.register('sw.js?v=30').then(function(reg) {
           reg.update();
-          console.log('[PWA] Service Worker v28 registrado:', reg.scope);
+          console.log('[PWA] Service Worker v30 registrado:', reg.scope);
 
           if (reg.waiting) {
             reg.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -215,6 +271,6 @@
       });
     }
   </script>
-  <script src="flutter_bootstrap.js?v=28" async></script>
+  <script src="flutter_bootstrap.js?v=30" async></script>
 </body>
 </html>
