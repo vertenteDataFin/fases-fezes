@@ -17,13 +17,13 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Fases e Fezes">
-  <link rel="apple-touch-icon" href="icons/app-logo-192.png?v=27">
+  <link rel="apple-touch-icon" href="icons/app-logo-192.png?v=28">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png?v=27"/>
+  <link rel="icon" type="image/png" href="favicon.png?v=28"/>
 
   <title>Fases e Fezes - Vertente</title>
-  <link rel="manifest" href="manifest.json?v=27">
+  <link rel="manifest" href="manifest.json?v=28">
 
   <style>
     body {
@@ -158,11 +158,11 @@
       }
     };
 
-    // Purgar de forma incondicional qualquer cache diferente da versão atual v27
+    // Purgar de forma incondicional qualquer cache diferente da versão atual v28
     if ('caches' in window) {
       caches.keys().then(function(cacheNames) {
         cacheNames.forEach(function(c) {
-          if (c !== 'fases-e-fezes-v27') {
+          if (c !== 'fases-e-fezes-v28') {
             console.log('[PWA] Purgando cache antigo:', c);
             caches.delete(c);
           }
@@ -190,9 +190,9 @@
       });
 
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('sw.js?v=27').then(function(reg) {
+        navigator.serviceWorker.register('sw.js?v=28').then(function(reg) {
           reg.update();
-          console.log('[PWA] Service Worker v27 registrado:', reg.scope);
+          console.log('[PWA] Service Worker v28 registrado:', reg.scope);
 
           if (reg.waiting) {
             reg.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -215,6 +215,6 @@
       });
     }
   </script>
-  <script src="flutter_bootstrap.js?v=27" async></script>
+  <script src="flutter_bootstrap.js?v=28" async></script>
 </body>
 </html>

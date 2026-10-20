@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fases-e-fezes-v27';
+const CACHE_NAME = 'fases-e-fezes-v28';
 
 const SHELL_ASSETS = [
   './',
@@ -9,7 +9,7 @@ const SHELL_ASSETS = [
 
 // Install: instala apenas o shell mínimo e ativa imediatamente
 self.addEventListener('install', (event) => {
-  console.log('[SW v27] Instalando...');
+  console.log('[SW v28] Instalando...');
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
@@ -22,7 +22,7 @@ self.addEventListener('install', (event) => {
 
 // Activate: purga caches antigos e assume o controle
 self.addEventListener('activate', (event) => {
-  console.log('[SW v27] Ativando...');
+  console.log('[SW v28] Ativando...');
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
